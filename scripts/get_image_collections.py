@@ -1,6 +1,6 @@
 import ee
 from datetime import datetime
-ee.Initialize()
+#ee.Initialize()
 
 """This module is only used for imageCollection prep, not compositing. See where its being called in BS_Mapper.ipynb..
 It is redundant with get_image_collection2.py and its functionality should get unified. """
