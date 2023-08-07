@@ -5,16 +5,17 @@ This module is mainly for exporting images in a variety of ways
 # utils.py
 import ee
 
-__defaults ={
+__defaults = {
     'landsat':{
         'exportScale':30,
         },
     'sentinel2':{
         'exportScale':10,
         },
+    'default':{
+        'exportScale':30,
+        },
     'bucket':'gee-upload',
-
-    
 }
 
 export_opts = {
@@ -86,7 +87,9 @@ def exportImgtoAsset(img, desc, region, asset_folder, export_type, export:bool=F
     elif export_type == 'single_fire':
         
         region = img.geometry()
-        scale = kwargs.get('scale', __defaults[kwargs.get('default')]['exportScale'])
+        #scale = kwargs.get('scale', __defaults[kwargs.get('default')]['exportScale'])
+        scale = kwargs.get('scale', __defaults.get('default')['exportScale'])
+
 
         task = ee.batch.Export.image.toAsset(image = img,
                                         description=desc,
