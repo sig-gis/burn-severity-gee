@@ -96,7 +96,7 @@ def main():
     logger.info(f"dtypes\n{gdf.dtypes}")
     gdf.loc[:,'Year'] = gdf.loc[:,'Discovery'].apply(lambda x: int(str(x)[0:4]))
     logger.info(f"gdf after Year field: {gdf.shape}")
-    gdf.loc[:,'Discovery'] = pd.to_datetime(gdf.loc[:,'Discovery'])
+    #gdf.loc[:,'Discovery'] = pd.to_datetime(gdf.loc[:,'Discovery'])
     gdf.loc[:,'Discovery'] = gdf.loc[:,'Discovery'].astype('str')
     logger.info(f"dtypes\n{gdf.dtypes}")
     
