@@ -86,7 +86,7 @@ def exportImgtoAsset(img, desc, region, asset_folder, export_type, export:bool=F
                                         )
     elif export_type == 'single_fire':
         
-        region = img.geometry()
+        ##region = img.geometry()
         #scale = kwargs.get('scale', __defaults[kwargs.get('default')]['exportScale'])
         scale = kwargs.get('scale', __defaults.get('default')['exportScale'])
 
