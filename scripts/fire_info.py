@@ -159,6 +159,7 @@ def set_windows(feat: ee.Feature):
     fire = ee.Feature(feat)
     fire_date = ee.Date(fire.getString('Discovery'))
     
+    ## TODO #make this a default, but otherwise use property in feature (for a simulation date)
     current_date = ee.Date(datetime.now())
     difference = current_date.difference(fire_date,'day')
     # if fire date is more than a year ago we can use historical mode (1 yr pre 1 yr post) 
