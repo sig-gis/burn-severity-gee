@@ -44,6 +44,28 @@ def miller_thresholds(rdnbr :ee.Image)-> ee.Image:
     
     return serv
 
+def miller_thresholds4(rdnbr :ee.Image)-> ee.Image:
+    '''generates miller thresholds from 1-4
+    1 : #very low or unburned
+    2 : low
+    3 : moderate
+    4 : high
+
+    Args:
+        rdnbr (ee.Image): Relative NBR img
+
+    Returns:
+        ee.Image: [description]
+    '''
+
+    serv = rdnbr.where(rdnbr.lte(69),1) \
+            .where(rdnbr.gte(69).And(rdnbr.lte(315)),2) \
+            .where(rdnbr.gt(315).And(rdnbr.lte(640)),3) \
+            .where(rdnbr.gt(640),4) \
+            .rename('MillersThresholds')
+    
+    return serv
+
 def bs_calc_new(feat: ee.Feature):
     fire = ee.Feature(feat)
     # fire_geom = fire.geometry()
@@ -65,5 +87,29 @@ def bs_calc_new(feat: ee.Feature):
     
     rdnbr_calc = rdnbr(pre_img,post_img)
     miller = miller_thresholds(rdnbr_calc)
+    
+    return ee.Image(miller).clip(region).select('MillersThresholds').toByte()
+
+
+def bs_calc_v2309(feat: ee.Feature):
+    fire = ee.Feature(feat)
+    
+    fire = ee.Feature(fi.set_windows(fire))
+    region = fire.geometry()
+  
+    pre_start = fire.get('pre_start')
+    pre_end = fire.get('pre_end')
+    post_start = fire.get('post_start')
+    post_end = fire.get('post_end')
+    
+    sensor = "landsat"
+    pre_collection = gic2.getLandsatToa(pre_start,pre_end,region)
+    pre_img = gic.get_composite(pre_collection,gic.make_pre_composite,pre_start,pre_end)
+
+    post_collection = gic2.getLandsatToa(post_start,post_end,region)
+    post_img = gic.get_composite(post_collection,gic.make_nrt_composite, sensor) 
+    
+    rdnbr_calc = rdnbr(pre_img,post_img)
+    miller = miller_thresholds4(rdnbr_calc)
     
     return ee.Image(miller).clip(region).select('MillersThresholds').toByte()
