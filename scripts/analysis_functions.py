@@ -37,6 +37,9 @@ def miller_thresholds(rdnbr :ee.Image)-> ee.Image:
         ee.Image: [description]
     '''
 
+#Miller, J. D., & Thode, A. E. (2007). Quantifying burn severity in a heterogeneous landscape 
+# with a relative version of the delta Normalized Burn Ratio (dNBR). 
+# Remote sensing of Environment, 109(1), 66-80.
     serv = rdnbr.where(rdnbr.lte(69),0) \
             .where(rdnbr.gte(69).And(rdnbr.lte(315)),1) \
             .where(rdnbr.gt(315).And(rdnbr.lte(640)),2) \
@@ -58,6 +61,9 @@ def miller_thresholds4(rdnbr :ee.Image)-> ee.Image:
         ee.Image: [description]
     '''
 
+#Miller, J. D., & Thode, A. E. (2007). Quantifying burn severity in a heterogeneous landscape 
+# with a relative version of the delta Normalized Burn Ratio (dNBR). 
+# Remote sensing of Environment, 109(1), 66-80.
     serv = rdnbr.where(rdnbr.lte(69),1) \
             .where(rdnbr.gte(69).And(rdnbr.lte(315)),2) \
             .where(rdnbr.gt(315).And(rdnbr.lte(640)),3) \
@@ -91,17 +97,14 @@ def bs_calc_new(feat: ee.Feature):
     return ee.Image(miller).clip(region).select('MillersThresholds').toByte()
 
 def rdnbr_only_calc(feat: ee.Feature):
-    fire = ee.Feature(feat)
-    # fire_geom = fire.geometry()
-    
-    fire = ee.Feature(fi.set_windows(fire))
-    region = fire.geometry()
-    # mode = fire.get('mode')
+    fire = ee.Feature(fi.set_windows(feat))
+
     pre_start = fire.get('pre_start')
     pre_end = fire.get('pre_end')
     post_start = fire.get('post_start')
     post_end = fire.get('post_end')
     
+    region = fire.geometry()
     sensor = "landsat"
     pre_collection = gic2.getLandsatToa(pre_start,pre_end,region)
     pre_img = gic.get_composite(pre_collection,gic.make_pre_composite,pre_start,pre_end)
@@ -110,13 +113,11 @@ def rdnbr_only_calc(feat: ee.Feature):
     post_img = gic.get_composite(post_collection,gic.make_nrt_composite, sensor) 
     
     rdnbr_calc = rdnbr(pre_img,post_img)
-    #miller = miller_thresholds(rdnbr_calc)
     
     return ee.Image(rdnbr_calc).clip(region)
 
 def bs_calc_v2309(feat: ee.Feature):
-    fire = ee.Feature(feat)
-    fire = ee.Feature(fi.set_windows(fire))
+    fire = ee.Feature(fi.set_windows_sim(feat))
 
     pre_start = fire.get('pre_start')
     pre_end = fire.get('pre_end')
@@ -131,7 +132,15 @@ def bs_calc_v2309(feat: ee.Feature):
     post_collection = gic2.getLandsatToa(post_start,post_end,region)
     post_img = gic.get_composite(post_collection,gic.make_nrt_composite, sensor) 
     
-    rdnbr_calc = rdnbr(pre_img,post_img)
-    miller = miller_thresholds4(rdnbr_calc)
+    rdnbr_calc = rdnbr(pre_img,post_img) #band name 'RdNBR' # 'RDNBR'?
+    miller = miller_thresholds4(rdnbr_calc) #band name 'MillersThresholds'
     
-    return ee.Image(miller).clip(region).select('MillersThresholds').toByte()
+    #create image with both bands
+    combined = rdnbr_calc.select('RdNBR') \
+        .addBands(miller.select('MillersThresholds').toByte()) \
+        .clip(region)
+    
+    return ee.Image(combined)
+    
+    
+   

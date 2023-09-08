@@ -149,7 +149,7 @@ def set_dates_historic_mode(feat: ee.Feature):
     post_end = ee.Date(feature.getString('Discovery')).advance(365, 'day') # 1 year later
     post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd')) # 1 year later
 
-    return feature.set('pre_start',pre_start,'pre_start_readable',pre_start_readable,
+    return feature.set('pre_start',pre_start, 'pre_start_readable',pre_start_readable,
                         'pre_end',pre_end, 'pre_end_readable', pre_end_readable,
                         'post_start',post_start, 'post_start_readable', post_start_readable,
                         'post_end',post_end, 'post_end_readable', post_end_readable)
@@ -159,9 +159,25 @@ def set_windows(feat: ee.Feature):
     fire = ee.Feature(feat)
     fire_date = ee.Date(fire.getString('Discovery'))
     
-    ## TODO #make this a default, but otherwise use property in feature (for a simulation date)
     current_date = ee.Date(datetime.now())
     difference = current_date.difference(fire_date,'day')
+    # if fire date is more than a year ago we can use historical mode (1 yr pre 1 yr post) 
+    # otherwise we have to use recent mode
+    mode = ee.Algorithms.If(difference.gte(365),ee.String('historical'),ee.String('recent'))
+    fire = fire.set('mode',mode)
+    fire = ee.Algorithms.If(ee.String(mode).equals('recent'),set_dates_recent_mode(fire),set_dates_historic_mode(fire))
+    return fire
+
+def set_windows_sim(feat: ee.Feature):
+    '''sets pre/post date windows in the feature's properties following ruleset based on recency of Fire Date'''
+    '''uses a date property on each feature for either the default of today or a simulated run as if on past date'''
+    fire = ee.Feature(feat)
+    fire_date = ee.Date(fire.getString('Discovery'))
+    
+    # Get simulated run date (set in main function)
+    run_date = fire.get('run_date')
+
+    difference = run_date.difference(fire_date,'day')
     # if fire date is more than a year ago we can use historical mode (1 yr pre 1 yr post) 
     # otherwise we have to use recent mode
     mode = ee.Algorithms.If(difference.gte(365),ee.String('historical'),ee.String('recent'))
