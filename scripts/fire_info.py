@@ -174,10 +174,11 @@ def set_windows_sim(feat: ee.Feature):
     fire = ee.Feature(feat)
     fire_date = ee.Date(fire.getString('Discovery'))
     
-    # Get simulated run date (set in main function)
-    run_date = fire.get('run_date')
+    # Get simulated run date (set in main function, formatted same as Discovery)
+    run_date = ee.Date(fire.getString('sim_date'))
 
     difference = run_date.difference(fire_date,'day')
+
     # if fire date is more than a year ago we can use historical mode (1 yr pre 1 yr post) 
     # otherwise we have to use recent mode
     mode = ee.Algorithms.If(difference.gte(365),ee.String('historical'),ee.String('recent'))

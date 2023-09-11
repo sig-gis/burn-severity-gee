@@ -117,6 +117,7 @@ def rdnbr_only_calc(feat: ee.Feature):
     return ee.Image(rdnbr_calc).clip(region)
 
 def bs_calc_v2309(feat: ee.Feature):
+    #set the pre and post fire windows, using the simulation version of the function
     fire = ee.Feature(fi.set_windows_sim(feat))
 
     pre_start = fire.get('pre_start')
@@ -126,21 +127,27 @@ def bs_calc_v2309(feat: ee.Feature):
     
     region = fire.geometry()
     sensor = "landsat"
+
     pre_collection = gic2.getLandsatToa(pre_start,pre_end,region)
     pre_img = gic.get_composite(pre_collection,gic.make_pre_composite,pre_start,pre_end)
 
     post_collection = gic2.getLandsatToa(post_start,post_end,region)
     post_img = gic.get_composite(post_collection,gic.make_nrt_composite, sensor) 
     
-    rdnbr_calc = rdnbr(pre_img,post_img) #band name 'RdNBR' # 'RDNBR'?
+    rdnbr_calc = rdnbr(pre_img,post_img) #band name 'RdNBR' 
     miller = miller_thresholds4(rdnbr_calc) #band name 'MillersThresholds'
-    
+
     #create image with both bands
+    # copies some properties over. Make sure to set up if switching to NIFC
     combined = rdnbr_calc.select('RdNBR') \
         .addBands(miller.select('MillersThresholds').toByte()) \
-        .clip(region)
-    
+        .clip(region) \
+        .set('fire_id', fire.get('fire_id'))
     return ee.Image(combined)
     
     
-   
+def bs_get_windows(feat: ee.Feature):
+    #set the pre and post fire windows, using the simulation version of the function
+    fire = ee.Feature(fi.set_windows_sim(feat))
+
+    return fire
