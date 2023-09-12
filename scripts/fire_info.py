@@ -100,7 +100,7 @@ def get_fire_info_from_feature(feat: ee.Feature, run_mode):
         pre_end = ee.String(ee.Date(feature.getString('Discovery')).advance(-275, 'day').format("Y-M-d"))  # 1 year prior, 90 days after discovery
         post_start = feature.getString('Discovery')  # actual fire discovery date
         post_end = ee.String(ee.Date(feature.getString('Discovery')).advance(90, 'day').format("Y-M-d"))   # 90 days after discovery
-  
+
     else:
         # historical mode
         pre_start = ee.String(ee.Date(feature.getString('Discovery')).advance(-455, 'day').format("Y-M-d")) # 1 year prior, 90 days before fire discovery
@@ -133,6 +133,100 @@ def set_dates_recent_mode(feat: ee.Feature):
                         'post_start',post_start, 'post_start_readable', post_start_readable,
                         'post_end',post_end, 'post_end_readable', post_end_readable)
 
+
+def set_dates_recent_mode_sim(feat: ee.Feature):
+    '''construct pre and post start and end dates using historic fire mode'''
+
+    run_date = ee.Date(feat.getString('run_date'))
+    fire_date = ee.Date(feat.getString('Discovery'))
+    
+    pre_start = fire_date.advance(-365, 'day') # 1 year prior to discovery (same day as Discovery)
+    pre_start_readable = ee.String(ee.Date(pre_start).format('YYYYMMdd')) 
+    
+    pre_end = fire_date.advance(-275, 'day')  # 1 year prior, 90 days after discovery
+    pre_end_readable = ee.String(ee.Date(pre_end).format('YYYYMMdd'))
+
+    post_start = fire_date.advance(1, 'day')  # actual fire discovery date ## do same Date.advance routine as others
+    post_start_readable = ee.String(ee.Date(post_start).format('YYYYMMdd'))
+
+    # Ensure that post end is NOT before sim date
+    # If sim date is before 90 day window, take the sim date,
+    #  otherwise use the 90 day window date.
+    # Using .millis() to be able to compare
+    post_90 = fire_date.advance(90, 'day')   # 90 days after discovery
+    post_end = ee.Date(post_90.millis().min(run_date.millis()))
+    post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd'))
+    
+    return feat.set('pre_start',pre_start,'pre_start_readable',pre_start_readable,
+                        'pre_end',pre_end, 'pre_end_readable',pre_end_readable,
+                        'post_start',post_start, 'post_start_readable',post_start_readable,
+                        'post_end',post_end, 'post_end_readable',post_end_readable)
+
+def set_dates_recent_mode_sliding(feat: ee.Feature):
+    '''construct pre and post start and end dates using historic fire mode'''
+    '''instead of using fixed window post fire, this slides along with the current (or sim) date, most RECENT 90 days'''
+    ''' note: does not make allowances for latency in data availability'''
+    ''' note: if less than 90 days since fire, takes range from fire to run/sim date'''
+    '''Requires to be called from set_windows_sim or variant of it that has the 'run_date' property on each feature'''
+
+    run_date = ee.Date(feat.getString('run_date'))
+    fire_date = ee.Date(feat.getString('Discovery'))
+
+    #post window will drive the other dates
+    post_end = run_date
+    post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd'))
+
+    post_start90 = run_date.advance(-90, 'day')
+    #take the latest date between the start of a 90 day window or the fire date
+    post_start = ee.Date(post_start90.millis().max(fire_date.advance(1,'day').millis())) 
+    post_start_readable = ee.String(ee.Date(post_start).format('YYYYMMdd'))
+
+    #pre window start is a year before, but always of the intended window (post_start90)
+    pre_start = post_start90.advance(-365, 'day')
+    pre_start_readable = ee.String(ee.Date(pre_start).format('YYYYMMdd')) 
+
+    pre_end = post_end.advance(-365, 'day')
+    pre_end_readable = ee.String(ee.Date(pre_end).format('YYYYMMdd')) 
+    
+    return feat.set('pre_start',pre_start,'pre_start_readable',pre_start_readable,
+                        'pre_end',pre_end, 'pre_end_readable',pre_end_readable,
+                        'post_start',post_start, 'post_start_readable',post_start_readable,
+                        'post_end',post_end, 'post_end_readable',post_end_readable)
+
+
+def set_dates_recent_mode_expanding(feat: ee.Feature):
+    '''construct pre and post start and end dates using historic fire mode'''
+    '''instead of using fixed 90 day window post fire, this expands with how much data is available to current(or sim)'''
+    ''' note: does not make allowances for latency in data availability'''
+    '''Requires to be called from set_windows_sim or variant of it that has the 'run_date' property on each feature'''
+    feature = ee.Feature(feat)
+
+    run_date = ee.Date(feat.getString('run_date'))
+    fire_date = ee.Date(feat.getString('Discovery'))
+
+    #post window: from discovery+1 to run date
+    post_start = fire_date.advance(1, 'day')
+    post_start_readable = ee.String(ee.Date(post_start).format('YYYYMMdd'))
+
+    #Cap post end at 1 year of duration
+    # This will prevent the pre_end from wrapping into the fire period
+    post_start365 = fire_date.advance(365, 'day')
+    post_end = ee.Date(post_start365.millis().min(run_date.millis()))
+    post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd'))
+
+    #pre window: can just subtract a year from post window dates
+    pre_start = post_start.advance(-365, 'day')
+    pre_start_readable = ee.String(ee.Date(pre_start).format('YYYYMMdd'))
+
+    pre_end = post_end.advance(-365, 'day')
+    pre_end_readable = ee.String(ee.Date(pre_end).format('YYYYMMdd'))
+    
+    return feature.set('pre_start',pre_start, 'pre_start_readable',pre_start_readable,
+                        'pre_end',pre_end, 'pre_end_readable',pre_end_readable,
+                        'post_start',post_start, 'post_start_readable',post_start_readable,
+                        'post_end',post_end, 'post_end_readable',post_end_readable)
+
+
 def set_dates_historic_mode(feat: ee.Feature):
     '''construct pre and post start and end dates using recent fire mode'''
     feature = ee.Feature(feat)
@@ -150,9 +244,9 @@ def set_dates_historic_mode(feat: ee.Feature):
     post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd')) # 1 year later
 
     return feature.set('pre_start',pre_start, 'pre_start_readable',pre_start_readable,
-                        'pre_end',pre_end, 'pre_end_readable', pre_end_readable,
-                        'post_start',post_start, 'post_start_readable', post_start_readable,
-                        'post_end',post_end, 'post_end_readable', post_end_readable)
+                        'pre_end',pre_end, 'pre_end_readable',pre_end_readable,
+                        'post_start',post_start, 'post_start_readable',post_start_readable,
+                        'post_end',post_end, 'post_end_readable',post_end_readable)
 
 def set_windows(feat: ee.Feature):
     '''sets pre/post date windows in the feature's properties following ruleset based on recency of Fire Date'''
@@ -175,13 +269,56 @@ def set_windows_sim(feat: ee.Feature):
     fire_date = ee.Date(fire.getString('Discovery'))
     
     # Get simulated run date (set in main function, formatted same as Discovery)
-    run_date = ee.Date(fire.getString('sim_date'))
+    sim_date = ee.Date(fire.getString('sim_date'))
 
-    difference = run_date.difference(fire_date,'day')
+    difference = sim_date.difference(fire_date,'day')
 
     # if fire date is more than a year ago we can use historical mode (1 yr pre 1 yr post) 
     # otherwise we have to use recent mode
     mode = ee.Algorithms.If(difference.gte(365),ee.String('historical'),ee.String('recent'))
     fire = fire.set('mode',mode)
-    fire = ee.Algorithms.If(ee.String(mode).equals('recent'),set_dates_recent_mode(fire),set_dates_historic_mode(fire))
+    #set sim date as run date for a variant set_dates_recent_mode
+    fire = fire.set('run_date',fire.get('sim_date'))
+    fire = ee.Algorithms.If(ee.String(mode).equals('recent'),set_dates_recent_mode_sim(fire),set_dates_historic_mode(fire))
     return fire
+
+def set_windows_sim_expanding(feat: ee.Feature):
+    '''sets pre/post date windows in the feature's properties following ruleset based on recency of Fire Date'''
+    '''uses a date property on each feature for either the default of today or a simulated run as if on past date'''
+    fire = ee.Feature(feat)
+    fire_date = ee.Date(fire.getString('Discovery'))
+    
+    # Get simulated run date (set in main function, formatted same as Discovery)
+    sim_date = ee.Date(fire.getString('sim_date'))
+
+    difference = sim_date.difference(fire_date,'day')
+
+    # if fire date is more than a year ago we can use historical mode (1 yr pre 1 yr post) 
+    # otherwise we have to use recent mode
+    mode = ee.Algorithms.If(difference.gte(365),ee.String('historical'),ee.String('recent'))
+    fire = fire.set('mode',mode)
+    #set sim date as run date for a variant set_dates_recent_mode
+    fire = fire.set('run_date',fire.get('sim_date'))
+    fire = ee.Algorithms.If(ee.String(mode).equals('recent'),set_dates_recent_mode_expanding(fire),set_dates_historic_mode(fire))
+    return fire
+
+def set_windows_sim_sliding(feat: ee.Feature):
+    '''sets pre/post date windows in the feature's properties following ruleset based on recency of Fire Date'''
+    '''uses a date property on each feature for either the default of today or a simulated run as if on past date'''
+    fire = ee.Feature(feat)
+    fire_date = ee.Date(fire.getString('Discovery'))
+    
+    # Get simulated run date (set in main function, formatted same as Discovery)
+    sim_date = ee.Date(fire.getString('sim_date'))
+
+    difference = sim_date.difference(fire_date,'day')
+
+    # if fire date is more than a year ago we can use historical mode (1 yr pre 1 yr post) 
+    # otherwise we have to use recent mode
+    mode = ee.Algorithms.If(difference.gte(365),ee.String('historical'),ee.String('recent'))
+    fire = fire.set('mode',mode)
+    #set sim date as run date for a variant set_dates_recent_mode
+    fire = fire.set('run_date',fire.get('sim_date'))
+    fire = ee.Algorithms.If(ee.String(mode).equals('recent'),set_dates_recent_mode_sliding(fire),set_dates_historic_mode(fire))
+    return fire
+
