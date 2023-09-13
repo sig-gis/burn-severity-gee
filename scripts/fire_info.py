@@ -169,14 +169,17 @@ def set_dates_recent_mode_sliding(feat: ee.Feature):
     ''' note: if less than 90 days since fire, takes range from fire to run/sim date'''
     '''Requires to be called from set_windows_sim or variant of it that has the 'run_date' property on each feature'''
 
+
     run_date = ee.Date(feat.getString('run_date'))
     fire_date = ee.Date(feat.getString('Discovery'))
 
     #post window will drive the other dates
-    post_end = run_date
+    post_end = run_date()
     post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd'))
 
+    #default post is a 90 window to run date
     post_start90 = run_date.advance(-90, 'day')
+    #avoid edge case where less than 90 days between fire and run date
     #take the latest date between the start of a 90 day window or the fire date
     post_start = ee.Date(post_start90.millis().max(fire_date.advance(1,'day').millis())) 
     post_start_readable = ee.String(ee.Date(post_start).format('YYYYMMdd'))
@@ -208,10 +211,11 @@ def set_dates_recent_mode_expanding(feat: ee.Feature):
     post_start = fire_date.advance(1, 'day')
     post_start_readable = ee.String(ee.Date(post_start).format('YYYYMMdd'))
 
-    #Cap post end at 1 year of duration
-    # This will prevent the pre_end from wrapping into the fire period
-    post_start365 = fire_date.advance(365, 'day')
-    post_end = ee.Date(post_start365.millis().min(run_date.millis()))
+        #Cap post end at 1 year of duration
+        # This will prevent the pre_end from wrapping into the fire period ## doesn't happen, removed
+        #post_start365 = fire_date.advance(365, 'day')
+        #post_end = ee.Date(post_start365.millis().min(run_date.millis()))
+    post_end = run_date
     post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd'))
 
     #pre window: can just subtract a year from post window dates
