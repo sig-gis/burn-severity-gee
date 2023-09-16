@@ -117,6 +117,7 @@ def rdnbr_only_calc(feat: ee.Feature):
     return ee.Image(rdnbr_calc).clip(region)
 
 def bs_calc_v2309(feat: ee.Feature):
+
     #set the pre and post fire windows, using the simulation version of the function
     fire = ee.Feature(fi.set_windows_sim(feat))
 
@@ -129,7 +130,7 @@ def bs_calc_v2309(feat: ee.Feature):
     sensor = "landsat"
 
     pre_collection = gic2.getLandsatToa(pre_start,pre_end,region)
-    pre_img = gic.get_composite(pre_collection,gic.make_pre_composite,pre_start,pre_end)
+    pre_img = gic.get_composite(pre_collection,gic.make_mean_composite,pre_start,pre_end)
 
     post_collection = gic2.getLandsatToa(post_start,post_end,region)
     # gic2.getLandsatToa should return an empty image collection if no data is available
@@ -147,8 +148,9 @@ def bs_calc_v2309(feat: ee.Feature):
     pc_nodata_filt = ee.ImageCollection(pc_nodata).filter(ee.Filter.eq('pc_size', 0))
     #merge two together (one or the other will be empty)
     post_collection_robust = post_collection.merge(pc_nodata_filt)
+    
     #continue with compositing
-    post_img = gic.get_composite(post_collection_robust,gic.make_nrt_composite, sensor) 
+    post_img = gic.get_composite(post_collection_robust,gic.make_mean_composite,post_start,post_end) 
     
     #Calculate RdNBR and Severity classes
     rdnbr_calc = rdnbr(pre_img,post_img) #band name 'RdNBR' 
@@ -162,112 +164,10 @@ def bs_calc_v2309(feat: ee.Feature):
         .set('fire_id', fire.get('fire_id'))
     return ee.Image(combined)
     
-def bs_calc_v2309expanding(feat: ee.Feature):
-    #set the pre and post fire windows, using the simulation version of the function
-    fire = ee.Feature(fi.set_windows_sim_expanding(feat))
-
-    pre_start = fire.get('pre_start')
-    pre_end = fire.get('pre_end')
-    post_start = fire.get('post_start')
-    post_end = fire.get('post_end')
-    
-    region = fire.geometry()
-    sensor = "landsat"
-
-    pre_collection = gic2.getLandsatToa(pre_start,pre_end,region)
-    pre_img = gic.get_composite(pre_collection,gic.make_pre_composite,pre_start,pre_end)
-
-    post_collection = gic2.getLandsatToa(post_start,post_end,region)
-        # gic2.getLandsatToa should return an empty image collection if no data is available
-    #  dev note: assumption is that gic.get_composite is the part that is failing if post_collection is empty
-    #  plan: create a nodata image as a placeholder
-    #        rdnbr_calc only use bands 'NIR','SWIR2', so only those made
-    pc_size = post_collection.size()
-    pc_nodata = ee.Image.constant(0).selfMask() \
-        .addBands(ee.Image.constant(0).selfMask()) \
-        .rename(['NIR','SWIR2']) \
-        .set('pc_size', pc_size) \
-        .set('system:time_start', ee.Date(post_end).millis()) #need to set as something, used in make_nrt_composite
-
-    #filter to only use when no images were returned
-    pc_nodata_filt = ee.ImageCollection(pc_nodata).filter(ee.Filter.eq('pc_size', 0))
-    #merge two together (one or the other will be empty)
-    post_collection_robust = post_collection.merge(pc_nodata_filt)
-    #continue with compositing
-    post_img = gic.get_composite(post_collection_robust,gic.make_nrt_composite, sensor) 
-    
-    rdnbr_calc = rdnbr(pre_img,post_img) #band name 'RdNBR' 
-    miller = miller_thresholds4(rdnbr_calc) #band name 'MillersThresholds'
-
-    #create image with both bands
-    # copies some properties over. Make sure to set up if switching to NIFC
-    combined = rdnbr_calc.select('RdNBR') \
-        .addBands(miller.select('MillersThresholds').toByte()) \
-        .clip(region) \
-        .set('fire_id', fire.get('fire_id'))
-    return ee.Image(combined)
-
-def bs_calc_v2309sliding(feat: ee.Feature):
-    #set the pre and post fire windows, using the simulation version of the function
-    fire = ee.Feature(fi.set_windows_sim_sliding(feat))
-
-    pre_start = fire.get('pre_start')
-    pre_end = fire.get('pre_end')
-    post_start = fire.get('post_start')
-    post_end = fire.get('post_end')
-    
-    region = fire.geometry()
-    sensor = "landsat"
-
-    pre_collection = gic2.getLandsatToa(pre_start,pre_end,region)
-    pre_img = gic.get_composite(pre_collection,gic.make_pre_composite,pre_start,pre_end)
-
-    post_collection = gic2.getLandsatToa(post_start,post_end,region)
-        # gic2.getLandsatToa should return an empty image collection if no data is available
-    #  dev note: assumption is that gic.get_composite is the part that is failing if post_collection is empty
-    #  plan: create a nodata image as a placeholder
-    #        rdnbr_calc only use bands 'NIR','SWIR2', so only those made
-    pc_size = post_collection.size()
-    pc_nodata = ee.Image.constant(0).selfMask() \
-        .addBands(ee.Image.constant(0).selfMask()) \
-        .rename(['NIR','SWIR2']) \
-        .set('pc_size', pc_size) \
-        .set('system:time_start', ee.Date(post_end).millis()) #need to set as something, used in make_nrt_composite
-
-    #filter to only use when no images were returned
-    pc_nodata_filt = ee.ImageCollection(pc_nodata).filter(ee.Filter.eq('pc_size', 0))
-    #merge two together (one or the other will be empty)
-    post_collection_robust = post_collection.merge(pc_nodata_filt)
-    #continue with compositing
-    post_img = gic.get_composite(post_collection_robust,gic.make_nrt_composite, sensor) 
-    
-    rdnbr_calc = rdnbr(pre_img,post_img) #band name 'RdNBR' 
-    miller = miller_thresholds4(rdnbr_calc) #band name 'MillersThresholds'
-
-    #create image with both bands
-    # copies some properties over. Make sure to set up if switching to NIFC
-    combined = rdnbr_calc.select('RdNBR') \
-        .addBands(miller.select('MillersThresholds').toByte()) \
-        .clip(region) \
-        .set('fire_id', fire.get('fire_id'))
-    return ee.Image(combined)
-
     
 def bs_get_windows(feat: ee.Feature):
     #set the pre and post fire windows, using the simulation version of the function
     fire = ee.Feature(fi.set_windows_sim(feat))
-
-    return fire
-
-def bs_get_windows_expanding(feat: ee.Feature):
-    #set the pre and post fire windows, using the simulation version of the function
-    fire = ee.Feature(fi.set_windows_sim_expanding(feat))
-
-    return fire
-
-def bs_get_windows_sliding(feat: ee.Feature):
-    #set the pre and post fire windows, using the simulation version of the function
-    fire = ee.Feature(fi.set_windows_sim_sliding(feat))
 
     return fire
 
