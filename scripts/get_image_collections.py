@@ -122,6 +122,10 @@ def make_pre_composite(col : ee.ImageCollection, start_date : str, end_date:str)
     pre = col.filterDate(start_date,end_date)    
     return pre.mean()
 
+def make_mean_composite(col : ee.ImageCollection, start_date : str, end_date:str)->ee.Image:
+    this_col = col.filterDate(start_date,end_date)    
+    return this_col.mean()
+
 def get_composite(col : ee.ImageCollection, func, *args : str )-> ee.Image:
     col = add_date_band(col, args[0])
     # when using in the fc burn severity notebook the *args are server-side compute objects not strings like in other notebook, so just commented out printing
@@ -161,5 +165,8 @@ if __name__ == '__main__':
     ped = '2020-06-01'
     preimg = get_composite(ls,make_pre_composite,psd,ped)
     print(preimg.bandNames().getInfo())
+
+    #just following the above patterns for adding make_mean_composite
+    img = get_composite(ls,make_mean_composite)
 
 
