@@ -96,25 +96,25 @@ def bs_calc_new(feat: ee.Feature):
     
     return ee.Image(miller).clip(region).select('MillersThresholds').toByte()
 
-def rdnbr_only_calc(feat: ee.Feature):
-    fire = ee.Feature(fi.set_windows(feat))
+# def rdnbr_only_calc(feat: ee.Feature):
+#     fire = ee.Feature(fi.set_windows(feat))
 
-    pre_start = fire.get('pre_start')
-    pre_end = fire.get('pre_end')
-    post_start = fire.get('post_start')
-    post_end = fire.get('post_end')
+#     pre_start = fire.get('pre_start')
+#     pre_end = fire.get('pre_end')
+#     post_start = fire.get('post_start')
+#     post_end = fire.get('post_end')
     
-    region = fire.geometry()
-    sensor = "landsat"
-    pre_collection = gic2.getLandsatToa(pre_start,pre_end,region)
-    pre_img = gic.get_composite(pre_collection,gic.make_pre_composite,pre_start,pre_end)
+#     ##region = fire.geometry() #multiple # to prevent unneeded pylance problem
+#     sensor = "landsat"
+#     pre_collection = gic2.getLandsatToa(pre_start,pre_end,region)
+#     pre_img = gic.get_composite(pre_collection,gic.make_pre_composite,pre_start,pre_end)
 
-    post_collection = gic2.getLandsatToa(post_start,post_end,region)
-    post_img = gic.get_composite(post_collection,gic.make_nrt_composite, sensor) 
+#     post_collection = gic2.getLandsatToa(post_start,post_end,region)
+#     post_img = gic.get_composite(post_collection,gic.make_nrt_composite, sensor) 
     
-    rdnbr_calc = rdnbr(pre_img,post_img)
+#     rdnbr_calc = rdnbr(pre_img,post_img)
     
-    return ee.Image(rdnbr_calc).clip(region)
+#     return ee.Image(rdnbr_calc).clip(region)
 
 def bs_calc_v2309(feat: ee.Feature):
 
@@ -127,33 +127,35 @@ def bs_calc_v2309(feat: ee.Feature):
     post_end = fire.get('post_end')
     
     region = fire.geometry()
-    sensor = "landsat"
+    #sensor = "landsat"
 
-    pre_collection = gic2.getLandsatToa(pre_start,pre_end,region)
+    pre_collection = gic2.getLandsatToaRobust(pre_start,pre_end,region)
     pre_img = gic.get_composite(pre_collection,gic.make_mean_composite,pre_start,pre_end)
 
-    post_collection = gic2.getLandsatToa(post_start,post_end,region)
-    # gic2.getLandsatToa should return an empty image collection if no data is available
-    #  dev note: assumption is that gic.get_composite is the part that is failing if post_collection is empty
+    post_collection = gic2.getLandsatToaRobust(post_start,post_end,region)
+    post_img = gic.get_composite(post_collection,gic.make_mean_composite,post_start,post_end) 
+    
+    #  dev note: composite returns an image with no bands when no data, so need to handle 
+    #            otherwise rdnbr() will error on no 'NIR' band available
     #  plan: create a nodata image as a placeholder
     #        rdnbr_calc only use bands 'NIR','SWIR2', so only those made
-    pc_size = post_collection.size()
-    pc_nodata = ee.Image.constant(0).selfMask() \
+    #   logic test: base on the size of the bandname list, as there will be an image returned from get composite
+    post_img_band_size = post_img.bandNames().size()
+    post_img = post_img.set('pci_size', post_img_band_size)
+    pci_nodata = ee.Image.constant(0).selfMask() \
         .addBands(ee.Image.constant(0).selfMask()) \
         .rename(['NIR','SWIR2']) \
-        .set('pc_size', pc_size) \
-        .set('system:time_start', ee.Date(post_end).millis()) #need to set as something, used in make_nrt_composite
-
-    #filter to only use when no images were returned
-    pc_nodata_filt = ee.ImageCollection(pc_nodata).filter(ee.Filter.eq('pc_size', 0))
+        .set('pci_size', post_img_band_size) 
+    #filter to only use when no bands in composite
+    pci_nodata_filt = ee.ImageCollection(pci_nodata).filter(ee.Filter.eq('pci_size', 0))
+    post_data_filt = ee.ImageCollection(post_img).filter(ee.Filter.neq('pci_size', 0))
     #merge two together (one or the other will be empty)
-    post_collection_robust = post_collection.merge(pc_nodata_filt)
-    
-    #continue with compositing
-    post_img = gic.get_composite(post_collection_robust,gic.make_mean_composite,post_start,post_end) 
-    
+    pc_img_merge = ee.ImageCollection(post_data_filt).merge(pci_nodata_filt)
+    #take first (will only ever be 1 image)
+    post_img_robust = ee.Image(pc_img_merge.first())
+
     #Calculate RdNBR and Severity classes
-    rdnbr_calc = rdnbr(pre_img,post_img) #band name 'RdNBR' 
+    rdnbr_calc = rdnbr(pre_img,post_img_robust) #band name 'RdNBR' 
     miller = miller_thresholds4(rdnbr_calc) #band name 'MillersThresholds'
 
     #create image with both bands ('RdNBR' and 'MillersThresholds')
@@ -164,6 +166,73 @@ def bs_calc_v2309(feat: ee.Feature):
         .set('fire_id', fire.get('fire_id'))
     return ee.Image(combined)
     
+# def bs_calc_v2309_db(feat: ee.Feature):
+#     # DEBUGGING FUNCTION. NOT MAPPED. SINGLE FIRE.
+
+#     #set the pre and post fire windows, using the simulation version of the function
+#     fire = ee.Feature(fi.set_windows_sim(feat))
+
+#     pre_start = fire.get('pre_start')
+#     pre_end = fire.get('pre_end')
+#     post_start = fire.get('post_start')
+#     post_end = fire.get('post_end')
+    
+#     ##region = fire.geometry()
+#     #sensor = "landsat"
+
+#     pre_collection = gic2.getLandsatToaRobust(pre_start,pre_end,region)
+#     pre_img = gic.get_composite(pre_collection,gic.make_mean_composite,pre_start,pre_end)
+#     #all bands in pre_img: ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'TEMP', 'SWIR2', 'QA_PIXEL', 'NDVI', 'NBR', 'EVI', 'constant', 'BRIGHTNESS', 'GREENNESS', 'WETNESS', 'GV', 'Shade', 'NPV', 'Soil', 'Cloud', 'NDFI', 'NDWI', 'NDMI', 'LSAVI', 'date']
+
+#     post_collection = gic2.getLandsatToaRobust(post_start,post_end,region)
+#     # gic2.getLandsatToa should return an empty image collection if no data is available
+#         #  dev note: assumption is that gic.get_composite is the part that is failing if post_collection is empty
+#         #  plan: create a nodata image as a placeholder
+#         #        rdnbr_calc only use bands 'NIR','SWIR2', so only those made
+#         # pc_size = post_collection.select('NIR').size()
+#         # pc_nodata = ee.Image.constant(0).selfMask() \
+#         #     .addBands(ee.Image.constant(0).selfMask()) \
+#         #     .rename(['NIR','SWIR2']) \
+#         #     .set('pc_size', pc_size) \
+#         #     .set('system:time_start', ee.Date(post_end).millis()) #most likely no longer need (used in make_nrt_composite)
+#         # #filter to only use when no images were returned
+#         # pc_nodata_filt = ee.ImageCollection(pc_nodata).filter(ee.Filter.eq('pc_size', 0))
+#         # #merge two together (one or the other will be empty)
+#         # post_collection_robust = post_collection.merge(pc_nodata_filt)
+#         # #continue with compositing
+#     post_img = gic.get_composite(post_collection,gic.make_mean_composite,post_start,post_end) 
+
+#     #  dev note: composite returns an image with no bands when no data, so need to handle 
+#     #            otherwise rdnbr() will error on no 'NIR' band available
+#     #  plan: create a nodata image as a placeholder
+#     #        rdnbr_calc only use bands 'NIR','SWIR2', so only those made
+#     #   logic test: base on the size of the bandname list, as there will be an image returned from get composite
+#     post_img_band_size = post_img.bandNames().size()
+#     post_img = post_img.set('pci_size', post_img_band_size)
+#     pci_nodata = ee.Image.constant(0).selfMask() \
+#         .addBands(ee.Image.constant(0).selfMask()) \
+#         .rename(['NIR','SWIR2']) \
+#         .set('pci_size', post_img_band_size) 
+#     #filter to only use when no bands in composite
+#     pci_nodata_filt = ee.ImageCollection(pci_nodata).filter(ee.Filter.eq('pci_size', 0))
+#     post_data_filt = ee.ImageCollection(post_img).filter(ee.Filter.neq('pci_size', 0))
+#     #merge two together (one or the other will be empty)
+#     pc_img_merge = ee.ImageCollection(post_data_filt).merge(pci_nodata_filt)
+#     #take first (will only ever be 1 image)
+#     post_img_robust = ee.Image(pc_img_merge.first())
+
+#     #Calculate RdNBR and Severity classes
+#     rdnbr_calc = rdnbr(pre_img,post_img_robust) #band name 'RdNBR' 
+#     miller = miller_thresholds4(rdnbr_calc) #band name 'MillersThresholds'
+
+#     #create image with both bands ('RdNBR' and 'MillersThresholds')
+#     # copies some properties over. Make sure to set up if switching to NIFC
+#     combined = rdnbr_calc \
+#         .addBands(miller.toByte()) \
+#         .clip(region) \
+#         .set('fire_id', fire.get('fire_id'))
+#     return ee.Image(combined)
+
     
 def bs_get_windows(feat: ee.Feature):
     #set the pre and post fire windows, using the simulation version of the function

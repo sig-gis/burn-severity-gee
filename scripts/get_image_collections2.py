@@ -577,3 +577,48 @@ def getLandsatToa(startDate, endDate, geometry=None): # exclude T2 due to qualit
     collection = doIndices(collection)
 
     return collection
+
+def getLandsatToaRobust(startDate, endDate, geometry=None): # exclude T2 due to quality requirements
+    collectionIds = {
+        'LANDSAT/LC09/C02/T1_TOA' : LANDSAT_BAND_DICT['L9'],
+        # 'LANDSAT/LC09/C02/T2_TOA' : LANDSAT_BAND_DICT['L9'],
+        'LANDSAT/LC08/C02/T1_TOA' : LANDSAT_BAND_DICT['L8'],
+        # 'LANDSAT/LC08/C02/T2_TOA' : LANDSAT_BAND_DICT['L8'],
+        'LANDSAT/LE07/C02/T1_TOA' : LANDSAT_BAND_DICT['L7'],
+        # 'LANDSAT/LE07/C02/T2_TOA' : LANDSAT_BAND_DICT['L7'],
+        'LANDSAT/LT05/C02/T1_TOA' : LANDSAT_BAND_DICT['L5'],
+        # 'LANDSAT/LT05/C02/T2_TOA' : LANDSAT_BAND_DICT['L5'],
+        'LANDSAT/LT04/C02/T1_TOA' : LANDSAT_BAND_DICT['L4'],
+        # 'LANDSAT/LT04/C02/T2_TOA' : LANDSAT_BAND_DICT['L4'],
+    }
+
+
+    collection = ee.ImageCollection([])
+    for name, bands in collectionIds.items():
+        # make new lists with QA_PIXEL included for cloud masking
+        bands = bands + ['QA_PIXEL']
+        readableBands = LANDSAT_BAND_NAMES + ['QA_PIXEL']
+
+        tmpCollection = ee.ImageCollection(name).select(bands, readableBands)
+        collection = mergeLandsatCols(collection, tmpCollection, startDate, endDate, geometry, prepareLsToa)
+    
+    #Handle situation where tmpCollection is (also) empty, with nodata image, so that doIndices doesn't fail
+    coll_size = ee.ImageCollection(collection).size()
+    ls_nodata = ee.Image.constant(0).selfMask() \
+        .addBands(ee.Image.constant(0).selfMask()) \
+        .addBands(ee.Image.constant(0).selfMask()) \
+        .addBands(ee.Image.constant(0).selfMask()) \
+        .addBands(ee.Image.constant(0).selfMask()) \
+        .addBands(ee.Image.constant(0).selfMask()) \
+        .rename(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2']) \
+        .set('coll_size', coll_size)
+    #filter to only use when no images were returned
+    ls_nodata_filt = ee.ImageCollection(ls_nodata).filter(ee.Filter.eq('coll_size', 0))
+    #merge two together (one or the other will be empty)
+    collection_robust = ee.ImageCollection(collection).merge(ls_nodata_filt)
+    #continue with calculations
+
+    #if tmpCollection was also empty, it fails here when trying to calculate indices, therefore robust addition above
+    collection = doIndices(collection_robust)
+
+    return collection
