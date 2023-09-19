@@ -159,11 +159,11 @@ def bs_calc_v2309(feat: ee.Feature):
     miller = miller_thresholds4(rdnbr_calc) #band name 'MillersThresholds'
 
     #create image with both bands ('RdNBR' and 'MillersThresholds')
-    # copies some properties over. Make sure to set up if switching to NIFC
+    # copies some properties over, includes a flag if there was enough data for a post fire window composite 
     combined = rdnbr_calc \
         .addBands(miller.toByte()) \
         .clip(region) \
-        .set('fire_id', fire.get('fire_id'))
+        .set('fire_id', fire.get('fire_id'), 'post_fire_calc', post_img_band_size.neq(0))  
     return ee.Image(combined)
     
 # def bs_calc_v2309_db(feat: ee.Feature):
