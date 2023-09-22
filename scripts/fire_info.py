@@ -220,11 +220,15 @@ def set_dates_recent_mode_expanding(feat: ee.Feature):
     post_end = run_date
     post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd'))
 
-    #pre window: can just subtract a year from post window dates
+    #pre window: can usually subtract a year from post window dates
     pre_start = post_start.advance(-365, 'day')
     pre_start_readable = ee.String(ee.Date(pre_start).format('YYYYMMdd'))
-
-    pre_end = post_end.advance(-365, 'day')
+    # However, for shortened post windows due to timing of Discovery and run/sim date, 
+    # we need a minimum window size or can/will run into no data issues in pre-window period.
+    # Picking a 90-day window to be consistent with fixed/original and sliding window calculations 
+    pre_end_365 = post_end.advance(-365, 'day')
+    pre_end_90_365 = post_start.advance(90, 'day').advance(-365, 'day') 
+    pre_end = ee.Date(pre_end_365.millis().max(pre_end_90_365.millis()))
     pre_end_readable = ee.String(ee.Date(pre_end).format('YYYYMMdd'))
     
     return feature.set('pre_start',pre_start, 'pre_start_readable',pre_start_readable,
