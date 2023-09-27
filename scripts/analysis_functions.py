@@ -1,5 +1,6 @@
 import ee
 import scripts.fire_info as fi
+import scripts.fire_info_ff3 as fi3
 #TODO: gic was the original module for all things imageCollection handling.. 
 #   we transitioned to using something similar that Collect Earth Online uses because its cleaner code.. 
 #   we eventually would like there to be only one module related to imageCollection handling (filtering,merging,compositing)..
@@ -166,6 +167,7 @@ def bs_calc_v2309(feat: ee.Feature):
         .set('fire_id', fire.get('fire_id'), 'post_fire_calc', post_img_band_size.neq(0))  
     return ee.Image(combined)
     
+
 # def bs_calc_v2309_db(feat: ee.Feature):
 #     # DEBUGGING FUNCTION. NOT MAPPED. SINGLE FIRE.
 
@@ -243,3 +245,59 @@ def bs_get_windows(feat: ee.Feature):
 
     return fire
 
+def bs_calc_ff3(feat: ee.Feature):
+    ''' Fire Factor Version 3 run code, based on simulation code with sim and filtering removed '''
+
+    #set the pre and post fire windows
+    fire = ee.Feature(fi3.set_windows_run(feat))
+
+    pre_start = fire.get('pre_start')
+    pre_end = fire.get('pre_end')
+    post_start = fire.get('post_start')
+    post_end = fire.get('post_end')
+    
+    region = fire.geometry()
+
+    pre_collection = gic2.getLandsatToaRobust(pre_start,pre_end,region)
+    pre_img = gic.get_composite(pre_collection,gic.make_mean_composite,pre_start,pre_end)
+
+    post_collection = gic2.getLandsatToaRobust(post_start,post_end,region)
+    post_img = gic.get_composite(post_collection,gic.make_mean_composite,post_start,post_end) 
+    
+    #  dev note: composite returns an image with no bands when no data, so need to handle 
+    #            otherwise rdnbr() will error on no 'NIR' band available
+    #  plan: create a nodata image as a placeholder
+    #        rdnbr_calc only use bands 'NIR','SWIR2', so only those made
+    #   logic test: base on the size of the bandname list, as there will be an image returned from get composite
+    post_img_band_size = post_img.bandNames().size()
+    post_img = post_img.set('pci_size', post_img_band_size)
+    pci_nodata = ee.Image.constant(0).selfMask() \
+        .addBands(ee.Image.constant(0).selfMask()) \
+        .rename(['NIR','SWIR2']) \
+        .set('pci_size', post_img_band_size) 
+    #filter to only use when no bands in composite
+    pci_nodata_filt = ee.ImageCollection(pci_nodata).filter(ee.Filter.eq('pci_size', 0))
+    post_data_filt = ee.ImageCollection(post_img).filter(ee.Filter.neq('pci_size', 0))
+    #merge two together (one or the other will be empty)
+    pc_img_merge = ee.ImageCollection(post_data_filt).merge(pci_nodata_filt)
+    #take first (will only ever be 1 image)
+    post_img_robust = ee.Image(pc_img_merge.first())
+
+    #Calculate RdNBR and Severity classes
+    rdnbr_calc = rdnbr(pre_img,post_img_robust) #band name 'RdNBR' 
+    miller = miller_thresholds4(rdnbr_calc) #band name 'MillersThresholds'
+
+    #create image with both bands ('RdNBR' and 'MillersThresholds')
+    # copies some properties over, includes a flag if there was enough data for a post fire window composite 
+    combined = rdnbr_calc \
+        .addBands(miller.toByte()) \
+        .clip(region) \
+        .set('fire_id', fire.get('fire_id'), 'post_fire_calc', post_img_band_size.neq(0))  
+    return ee.Image(combined)
+
+
+def bs_get_windows_ff3(feat: ee.Feature):
+    #set the pre and post fire windows, using the simulation version of the function
+    fire = ee.Feature(fi3.set_windows_run(feat))
+
+    return fire

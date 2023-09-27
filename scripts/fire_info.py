@@ -111,7 +111,7 @@ def get_fire_info_from_feature(feat: ee.Feature, run_mode):
     return region, pre_start, pre_end, post_start, post_end
 
 def set_dates_recent_mode(feat: ee.Feature):
-    '''construct pre and post start and end dates using historic fire mode'''
+    '''construct pre and post start and end dates using recent fire mode'''
     feature = ee.Feature(feat)
     
     pre_start = ee.Date(feature.getString('Discovery')).advance(-365, 'day') # 1 year prior, same day of discovery# 1 year prior, same day of discovery
@@ -135,7 +135,7 @@ def set_dates_recent_mode(feat: ee.Feature):
 
 
 def set_dates_recent_mode_sim(feat: ee.Feature):
-    '''construct pre and post start and end dates using historic fire mode'''
+    '''construct pre and post start and end dates using recent fire mode'''
 
     run_date = ee.Date(feat.getString('run_date'))
     fire_date = ee.Date(feat.getString('Discovery'))
@@ -160,8 +160,9 @@ def set_dates_recent_mode_sim(feat: ee.Feature):
     return feat.set('pre_start',pre_start,'pre_start_readable',pre_start_readable,
                         'pre_end',pre_end, 'pre_end_readable',pre_end_readable,
                         'post_start',post_start, 'post_start_readable',post_start_readable,
-                        'post_end',post_end, 'post_end_readable',post_end_readable,
-                        'double_check','fixed')
+                        'post_end',post_end, 'post_end_readable',post_end_readable)
+
+
 
 def set_dates_recent_mode_sliding(feat: ee.Feature):
     '''construct pre and post start and end dates using historic fire mode'''
@@ -236,6 +237,7 @@ def set_dates_recent_mode_expanding(feat: ee.Feature):
                         'post_start',post_start, 'post_start_readable',post_start_readable,
                         'post_end',post_end, 'post_end_readable',post_end_readable,
                         'double_check','expanding')
+
 
 
 def set_dates_historic_mode(feat: ee.Feature):
