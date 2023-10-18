@@ -7,10 +7,10 @@ def set_dates_recent_fixed(feat: ee.Feature):
 
     fire_date = ee.Date(feat.getString('Discovery'))
     
-    pre_start = fire_date.advance(-365, 'day') # 1 year prior to discovery (same day as Discovery)
+    pre_start = fire_date.advance(-366, 'day') # 1 year prior to discovery (same day as Discovery)
     pre_start_readable = ee.String(ee.Date(pre_start).format('YYYYMMdd')) 
     
-    pre_end = fire_date.advance(-275, 'day')  # 1 year prior, 90 days after discovery
+    pre_end = fire_date.advance(-276, 'day')  # 1 year prior, 90 days after discovery
     pre_end_readable = ee.String(ee.Date(pre_end).format('YYYYMMdd'))
 
     post_start = fire_date.advance(1, 'day')  # actual fire discovery date ## do same Date.advance routine as others
@@ -43,17 +43,17 @@ def set_dates_recent_sliding(feat: ee.Feature):
     post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd'))
 
     #nominal post is a 90 window to run date
-    post_start90 = run_date.advance(-90, 'day')
+    post_start90 = run_date.advance(-91, 'day')
     #avoid edge case where less than 90 days between fire and run date
     #take the latest date between the start of a 90 day window or the fire date
     post_start = ee.Date(post_start90.millis().max(fire_date.advance(1,'day').millis())) 
     post_start_readable = ee.String(ee.Date(post_start).format('YYYYMMdd'))
 
     #pre window start is a year before, but always of the intended window (post_start90)
-    pre_start = post_start90.advance(-365, 'day')
+    pre_start = post_start90.advance(-366, 'day')
     pre_start_readable = ee.String(ee.Date(pre_start).format('YYYYMMdd')) 
 
-    pre_end = post_end.advance(-365, 'day')
+    pre_end = post_end.advance(-366, 'day')
     pre_end_readable = ee.String(ee.Date(pre_end).format('YYYYMMdd')) 
     
     return feat.set('pre_start',pre_start,'pre_start_readable',pre_start_readable,
@@ -81,13 +81,13 @@ def set_dates_recent_expanding(feat: ee.Feature):
     post_end_readable = ee.String(ee.Date(post_end).format('YYYYMMdd'))
 
     #pre window: can usually subtract a year from post window dates
-    pre_start = post_start.advance(-365, 'day')
+    pre_start = post_start.advance(-366, 'day')
     pre_start_readable = ee.String(ee.Date(pre_start).format('YYYYMMdd'))
     # However, for shortened post windows due to timing of Discovery and run/sim date, 
     # we need a minimum window size or can/will run into no data issues in pre-window period.
     # Picking a 90-day window to be consistent with fixed/original and sliding window calculations 
-    pre_end_365 = post_end.advance(-365, 'day')
-    pre_end_90_365 = post_start.advance(90, 'day').advance(-365, 'day') 
+    pre_end_365 = post_end.advance(-366, 'day')
+    pre_end_90_365 = post_start.advance(90, 'day').advance(-366, 'day') 
     pre_end = ee.Date(pre_end_365.millis().max(pre_end_90_365.millis()))
     pre_end_readable = ee.String(ee.Date(pre_end).format('YYYYMMdd'))
     
@@ -102,10 +102,11 @@ def set_dates_historic_mode(feat: ee.Feature):
     '''construct pre and post start and end dates using recent fire mode'''
     feature = ee.Feature(feat)
     
-    pre_start = ee.Date(feature.getString('Discovery')).advance(-455, 'day') # 1 year prior, 90 days before fire discovery
-    pre_start_readable = ee.String(ee.Date(pre_start).advance(-455, 'day').format('YYYYMMdd')) # 1 year prior, 90 days before fire discovery
+    #advance an extra negative day for off by one window alignment issues
+    pre_start = ee.Date(feature.getString('Discovery')).advance(-456, 'day') # 1 year prior, 90 days before fire discovery
+    pre_start_readable = ee.String(ee.Date(pre_start).advance(-456, 'day').format('YYYYMMdd')) # 1 year prior, 90 days before fire discovery
 
-    pre_end = ee.Date(feature.getString('Discovery')).advance(-365, 'day')  # 1 year prior
+    pre_end = ee.Date(feature.getString('Discovery')).advance(-366, 'day')  # 1 year prior
     pre_end_readable = ee.String(ee.Date(pre_end).format('YYYYMMdd'))  # 1 year prior
 
     post_start = ee.Date(feature.getString('Discovery')).advance(275, 'day') # 1 year later, 90 days before fire discovery
