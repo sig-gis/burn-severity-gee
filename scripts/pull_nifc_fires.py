@@ -160,7 +160,7 @@ def main():
         raise RuntimeError("Provided filters resulting in 0 records, try another set of filters")
     
     # clip to CONUS to remove AK and HI fires
-    conus=gpd.read_file(r'C:\Users\nekodawn\python_local\burn-severity-gee\data\shp\tl_2021_us_state\tl_2021_us_state.shp')
+    conus=gpd.read_file(r'C:\Users\nekodawn\code_local\burn-severity-gee\data\shp\tl_2021_us_state\tl_2021_us_state.shp')
     conus=conus.to_crs(gdf_final.crs)
     not_conus=['AK','HI']
     conus = conus[~conus['STUSPS'].isin(not_conus)]
