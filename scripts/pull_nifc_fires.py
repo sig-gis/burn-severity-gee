@@ -141,8 +141,13 @@ def main():
     start = pd.to_datetime(f'{year_choice}-01-01')
     end = pd.to_datetime(f'{year_choice}-12-31')
     gdf_yr = gdf[ (gdf.Discovery >= start) & (gdf.Discovery <= end ) ]
-    gdf_yr.loc[:,'Discovery'] = gdf_yr.loc[:,'Discovery'].astype(str)
+    #gdf_yr.loc[:,'Discovery'] = gdf_yr.loc[:,'Discovery'].astype(str)
+    gdf_yr['Discovery'] = gdf_yr['Discovery'].astype('string')
     # print(gdf_yr.head(5))
+    # print(gdf_yr.head(1))
+    # test_disc = gdf_yr.head(1)['Discovery']
+    # print(test_disc)
+    # print(isinstance(test_disc, str))
     
     # filter by acreage if provided
     if not acre_min == None:
@@ -155,7 +160,7 @@ def main():
         raise RuntimeError("Provided filters resulting in 0 records, try another set of filters")
     
     # clip to CONUS to remove AK and HI fires
-    conus=gpd.read_file(r'C:\FireFactor\T2Fuels\nrt_burn_severity\data\shp\tl_2021_us_state\tl_2021_us_state.shp')
+    conus=gpd.read_file(r'C:\Users\nekodawn\python_local\burn-severity-gee\data\shp\tl_2021_us_state\tl_2021_us_state.shp')
     conus=conus.to_crs(gdf_final.crs)
     not_conus=['AK','HI']
     conus = conus[~conus['STUSPS'].isin(not_conus)]
