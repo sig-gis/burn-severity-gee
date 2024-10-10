@@ -9,11 +9,11 @@ import logging
 
 Pulls an annual Subset of NIFC fire perimeters and does data preprocessing to set up for EE NRT Burn Severity tool
 
-Usage Example: python pull_nifc_fires_v2.py -y 2021 -a 500 -o C:\\FireFactor\\T2Fuels\\nrt_burn_severity
+Usage Example: python pull_nifc_fires.py -y 2021 -a 500 -o C:\\FireFactor\\T2Fuels\\burn-severity-gee
 
 Required arguments:
 -y Year
--o output Directory (nrt_burn_severty repo root directory so it places shapefiles in nrt_burn_severity/data/shp/)
+-o output Directory (burn-severity-gee repo root directory so it places shapefiles in burn-severity-geey/data/shp/)
 
 
 '''

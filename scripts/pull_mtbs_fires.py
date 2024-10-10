@@ -21,7 +21,7 @@ def main():
 # initalize new cli parser
     parser = argparse.ArgumentParser(
         description="Pull annual fire perimeter data from MTBS burned area dataset",
-        usage="python scripts/pull_mtbs_fires.py -y 2020 -a 500 -o C:\FireFactor\T2Fuels\nrt_burn_severity --cleanup"
+        usage="python scripts/pull_mtbs_fires.py -y 2020 -a 500 -o C:\FireFactor\T2Fuels\burn-severity-gee --cleanup"
     )
 
     parser.add_argument(
