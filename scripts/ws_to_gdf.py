@@ -30,7 +30,7 @@ def to_gdf(url):
     # change baseurl to the service url
     BASEURL = url #url string passed to the function
 
-    r = requests.get(BASEURL+"/queryDomains",params=dict(f="json"),verify=False)
+    r = requests.get(BASEURL,params=dict(f="json"),verify=False)
     service_metadata = r.json()
 
     if 'error' in service_metadata.keys():
@@ -60,10 +60,10 @@ def to_gdf(url):
     f="JSON"
     )
 
-    r = requests.get(BASEURL+"/query",params=idquery,verify=False)
+    rid = requests.get(BASEURL+"/query",params=idquery,verify=False)
 
     # get object ids as list
-    objectids= r.json()["objectIds"]
+    objectids= rid.json()["objectIds"]
 
     # need to chunk into multiple queries to avoid really long urls
     # long urls cannot be sent and will return errors, this helps prevent that
@@ -72,19 +72,16 @@ def to_gdf(url):
     # function to request features based on object ids
     # this is required so we can send concurrent requests based on chunks of ids
     def getfeatures(oids):
-
         featurequery = dict(
             objectIds=','.join(map(str, oids)),
             outSR=spatialref,
-            geometry=json.dumps(extent),
-            geometryType="esriGeometryEnvelope",
             outFields = '*',
             f="GeoJSON"
         )
 
-        r = requests.get(BASEURL+"/query",params=featurequery,verify=False)
+        rf = requests.get(BASEURL+"/query",params=featurequery,verify=False)
 
-        feature_dict = r.json()
+        feature_dict = rf.json()
 
         # check if the result is in fact a FeatureCollection GeoJSON
         # for some reason services return 200 with a dict of 400 error...WTF ESRI...
@@ -107,11 +104,11 @@ def to_gdf(url):
     return gdf
     # do whatever formatting needed with the geodataframe
 
-# %%
-# #testing
-# url = 'https://services1.arcgis.com/Pat8LQYI0Udhgy4G/ArcGIS/rest/services/NMVeg_July2017/FeatureServer/5'
+#testing
+# url = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/InterAgencyFirePerimeterHistory_All_Years_View/FeatureServer/0" # authority < 2020
+
 # extent, spatialref = parse_crs_extent(url)
 # print(extent, '\n', spatialref)
 # gdf = to_gdf(url)
-# gdf
-# %%
+# print(gdf.head())
+# print(gdf.shape)

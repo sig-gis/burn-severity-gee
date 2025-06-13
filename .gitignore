@@ -1,4 +1,12 @@
 __pycache__
 .ipynb_checkpoints/
 
-data/*
+# shapefile and sidecar files
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.qpj
+*.sbn
+*.sbx

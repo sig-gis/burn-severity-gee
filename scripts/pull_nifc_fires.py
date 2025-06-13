@@ -49,18 +49,22 @@ def main():
     dir = args.outdir
     year_choice = args.year
     acre_min = args.acres
-    # TODO: we really don't need to let the user choose the outdir.. just hardcode it to find the repo parent directory.
+    
     data_dir = os.path.join(dir, 'data', 'shp')
+    os.makedirs(data_dir, exist_ok=True)
+    
     today_string = datetime.utcnow().strftime("%Y-%m-%d").replace("-", "")
 
     # web service url of NIFC fires
     url = 'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters/FeatureServer/0'
-    # url = 'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/Fire_History_Perimeters_Public/FeatureServer/0'
+    
     extent, spatialref = parse_crs_extent(url)
 
     filename_prefix = 'nifc_fires_all'
     out_shp = os.path.join(data_dir,f'{filename_prefix}_{today_string}.shp')
 
+    # we decide to export the whole raw NIFC dataset as an intermediate step 
+    # so that upon subsequent CLI calls you don't have to access the REST service again..
     if not os.path.exists(out_shp):
         print('pulling nifc fires from web service')
         #read in from web service then export to shapefile
@@ -71,7 +75,6 @@ def main():
         #read it back in from the shapefile
         print(f'reading nifc fires from {out_shp}')    
         gdf = gpd.read_file(out_shp)
-
     else:
         print(f'reading nifc fires from {out_shp}')
         gdf = gpd.read_file(out_shp)
@@ -85,12 +88,9 @@ def main():
         level=logging.WARNING,
     )
     logger = logging.getLogger(__name__)
-
-    # set verbosity level to INFO if user runs with verbose flag
     logger.setLevel(logging.INFO)
-
     logger.info(f'Year Filter: {year_choice} | Acreage Minimum: {acre_min}')
-    print('original length',len(gdf))
+    logger.info(f'original length: {len(gdf)}')
     # subset columns - had to look these up from the dataset since field names get changed upon read-in
     # 
     # OBJECTID: 'OBJECTID'
@@ -101,6 +101,7 @@ def main():
     # Fire Out Date Time: 'attr_FirO'
     # Containment Date Time: 'attr_Conta'
     # Initial Response Date Time: 'attr_Ini_3'
+    # POOSt: 'State'
     # Global ID: 'GlobalID'
     # geometry: 'geometry'
     gdf = gdf.loc[:,['OBJECTID',
@@ -111,10 +112,10 @@ def main():
                     #  'attr_FireO', 
                     #  'attr_Conta',
                     #  'attr_Ini_3',
+                     'attr_POOSt', 
                      'GlobalID',
                      'geometry']]
-    # print(list(gdf.columns))
-    # print(gdf.head(5))
+
     gdf = gdf.rename(columns={
                             'poly_Incid': 'Name', 
                             'poly_GISAc':'GISAcres', 
@@ -123,7 +124,10 @@ def main():
                             # 'attr_FirO':'Out',
                             # 'attr_Conta':'Containment',
                             # 'attr_Ini_3': 'Response'
+                            'attr_POOSt': 'State'
                             })
+    # print(gdf.head(5))
+
     # using Discovery field for now, 
     # if you decide you want other datetime fields you'll need to convert them using below operation
     
@@ -136,39 +140,32 @@ def main():
     gdf.loc[:,'Discovery'] = pd.to_datetime(gdf.loc[:,'Discovery'].apply(lambda d: datetime.fromtimestamp(int(d)/1000).strftime('%Y-%m-%d')))#.astype('str') 
     # gdf.loc[:,'Year'] = [int(s[0:4]) for s in gdf.loc[:,'Discovery']]
     # gdf_yr = gdf.loc[gdf.Year == year_choice]
-    # print('converting discovery to date string\n',gdf.head())
-    # print('dtpyes now ',gdf.dtypes)
+    # logger.info('converting discovery to date string')
+    # print(gdf.head())
+    # logger.info(f'dtpyes now:')
+    # print(gdf.dtypes)
+    
     start = pd.to_datetime(f'{year_choice}-01-01')
     end = pd.to_datetime(f'{year_choice}-12-31')
     gdf_yr = gdf[ (gdf.Discovery >= start) & (gdf.Discovery <= end ) ]
     #gdf_yr.loc[:,'Discovery'] = gdf_yr.loc[:,'Discovery'].astype(str)
     gdf_yr['Discovery'] = gdf_yr['Discovery'].astype('string')
     # print(gdf_yr.head(5))
-    # print(gdf_yr.head(1))
-    # test_disc = gdf_yr.head(1)['Discovery']
-    # print(test_disc)
-    # print(isinstance(test_disc, str))
     
     # filter by acreage if provided
     if not acre_min == None:
         gdf_yr = gdf_yr[gdf_yr.Acres >= acre_min]
-    print('rows after year and acreage filters',len(gdf_yr))
+    # logger.info(f'rows after year and acreage filters: {len(gdf_yr)}')
     
     # subset columns for final shapefile
-    gdf_final = gdf_yr[['OBJECTID', 'Name', 'Acres', 'Discovery','GlobalID','geometry']]
+    gdf_final = gdf_yr[['OBJECTID', 'Name', 'Acres', 'Discovery','State','GlobalID','geometry']]
     if gdf_final.shape[0] == 0:
         raise RuntimeError("Provided filters resulting in 0 records, try another set of filters")
     
-    # clip to CONUS to remove AK and HI fires
-    conus=gpd.read_file(r'C:\Users\nekodawn\code_local\burn-severity-gee\data\shp\tl_2021_us_state\tl_2021_us_state.shp')
-    conus=conus.to_crs(gdf_final.crs)
-    not_conus=['AK','HI']
-    conus = conus[~conus['STUSPS'].isin(not_conus)]
-    gdf_final_conus=gpd.clip(gdf_final,conus)
-    print('final conus records',len(gdf_final_conus))
+    gdf_final_conus = gdf_final[~gdf_final['State'].isin(['US-VI','US-GU','US-PR','US-AK','US-HI'])]
+    logger.info(f'final conus records: {len(gdf_final_conus)}')
     # print(gdf_final.sort_values(by='Acres').head(10))
 
-    
     # write to shp
     logger.info(f'Saving shapefile with {gdf_final_conus.shape[0]} records')
     if not acre_min == None:
