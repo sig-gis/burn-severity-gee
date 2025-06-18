@@ -104,7 +104,7 @@ def set_dates_historic_mode(feat: ee.Feature):
     
     #advance an extra negative day for off by one window alignment issues
     pre_start = ee.Date(feature.getString('Discovery')).advance(-456, 'day') # 1 year prior, 90 days before fire discovery
-    pre_start_readable = ee.String(ee.Date(pre_start).advance(-456, 'day').format('YYYYMMdd')) # 1 year prior, 90 days before fire discovery
+    pre_start_readable = ee.String(ee.Date(pre_start).format('YYYYMMdd')) # 1 year prior, 90 days before fire discovery
 
     pre_end = ee.Date(feature.getString('Discovery')).advance(-366, 'day')  # 1 year prior
     pre_end_readable = ee.String(ee.Date(pre_end).format('YYYYMMdd'))  # 1 year prior

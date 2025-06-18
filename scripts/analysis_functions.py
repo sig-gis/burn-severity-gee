@@ -301,3 +301,50 @@ def bs_get_windows_ff3(feat: ee.Feature):
     fire = ee.Feature(fi3.set_windows_run(feat))
 
     return fire
+
+def debug_img_collections_coll_size(feat:ee.Feature):
+    """
+    return pre and post image collection sizes for each fire feature for debugging
+    """
+
+    #set the pre and post fire windows
+    fire = ee.Feature(fi3.set_windows_run(feat))
+
+    pre_start = fire.get('pre_start')
+    pre_end = fire.get('pre_end')
+    post_start = fire.get('post_start')
+    post_end = fire.get('post_end')
+    
+    region = fire.geometry()
+
+    pre_collection = gic2.getLandsatToaRobust(pre_start,pre_end,region)
+
+    post_collection = gic2.getLandsatToaRobust(post_start,post_end,region)
+    return feat.set('pre_coll_size', pre_collection.size(),
+                    'post_coll_size', post_collection.size(),
+    )
+
+def debug_img_collections_comp(feat:ee.Feature):
+    """
+    return pre and post image collection sizes for each fire feature for debugging
+    """
+
+    #set the pre and post fire windows
+    fire = ee.Feature(fi3.set_windows_run(feat))
+
+    pre_start = fire.get('pre_start')
+    pre_end = fire.get('pre_end')
+    post_start = fire.get('post_start')
+    post_end = fire.get('post_end')
+    
+    region = fire.geometry()
+
+    pre_collection = gic2.getLandsatToaRobust(pre_start,pre_end,region)
+    post_collection = gic2.getLandsatToaRobust(post_start,post_end,region)
+    
+    pre_img = gic.get_composite(pre_collection,gic.make_mean_composite,pre_start,pre_end)
+    post_img = gic.get_composite(post_collection,gic.make_mean_composite,post_start,post_end) 
+    return feat.set('pre_comp_bands', pre_img.bandNames().size(),
+                    'post_comp_bands', post_img.bandNames().size(),
+    )
+    
